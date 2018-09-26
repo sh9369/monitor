@@ -1,0 +1,119 @@
+# =============================================================================
+# 本文件定义规则的配置信息.
+#
+# ZHANG Li Dan <lidan.zhang@clearclouds-global.com>
+# 南京云利来 (C) 2018-2019
+# this is for check the intelligence http/https domain and ip
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 基本配置.
+#
+# __type__:  报警类型;
+# __range__: 检测数据时间窗口 (从当前到过去一段时间);
+# -----------------------------------------------------------------------------
+__type__  = "TCP";
+__range__ = "5m";
+__long_range__ = "12h";
+__ihost__ = "172.23.1.77";
+__wl_port__ =[
+		{"port":22,"dip":["172.23.1.168"]},
+		{"port":9300,"dip":[]},
+		{"port":443,"dip":["#"]},
+		{"port":80,"dip":["#"]}
+	];
+__wl_domain__ =["#"];
+# -----------------------------------------------------------------------------
+# 3_times_handshake succeeded flg
+# -----------------------------------------------------------------------------
+__valid_status__ = [ 3, 4, 5, 6, 7, 8, 13, 14, 15 ];
+
+
+# -----------------------------------------------------------------------------
+# 检测 dport 配置信息
+# -----------------------------------------------------------------------------
+#threshold     = 120;
+desc_type     = "[monitor] iMAP has suspect connection";
+desc_subtype  = "Try to connect with outside by suspect dport";
+__cfg_dport__ = {
+	"type":      "suspect_connection",
+	"subtype":	"suspect_dport",
+	"level":     "warn",
+	#"threshold": threshold,
+	"refer_enable": true,
+	"refer_range":  "last_weeks(2, %(__range__))",
+	"refer_def":    60,
+	"refer_factor": 2.5,
+
+	"desc_type":    desc_type,
+	"desc_subtype": desc_subtype,
+	"desc_action":  "Please check it out.",
+	"desc_title":   desc_type + ": " + desc_subtype
+};
+
+
+
+# -----------------------------------------------------------------------------
+# 检测 domain 配置信息
+# -----------------------------------------------------------------------------
+#threshold     = 120;
+desc_type     = "[monitor] iMAP has suspect connection";
+desc_subtype  = "Try to connect with suspect dip";
+__cfg_domain__ = {
+	"type":      "suspect_connection",
+	"subtype":	"suspect_dip",
+	"level":     "info",
+	#"threshold": threshold,
+	"refer_enable": true,
+	"refer_range":  "last_weeks(2, %(__range__))",
+	"refer_def":    60,
+	"refer_factor": 2.5,
+
+	"desc_type":    desc_type,
+	"desc_subtype": desc_subtype,
+	"desc_action":  "Please check it out.",
+	"desc_title":   desc_type + ": " + desc_subtype
+};
+
+
+# -----------------------------------------------------------------------------
+# 检测 三次握手 配置信息
+# -----------------------------------------------------------------------------
+#threshold     = 120;
+desc_type     = "[monitor] iMAP has suspect connection";
+desc_subtype  = "Connected with suspect dip";
+__cfg_sip_dip__ = {
+	"type":      "suspect_connection",
+	"subtype":	 "3_times_handshake",
+	"level":     "warn",
+	#"threshold": threshold,
+
+	"refer_enable": true,
+	"refer_range":  "last_weeks(2, %(__range__))",
+	"refer_def":    60,
+	"refer_factor": 2.5,
+
+	"desc_type":    desc_type,
+	"desc_subtype": desc_subtype,
+	"desc_action":  "Please check it out.",
+	"desc_title":   desc_type + ": " + desc_subtype
+};
+
+# -----------------------------------------------------------------------------
+# Configuration of fields description (for emails).
+#
+# <key>:        Field name.
+# <value>.desc: Field description.
+# <value>.fmt:  Data format.
+# -----------------------------------------------------------------------------
+__fields_all__ = {
+	"@timestamp":   { "desc": "Timestamp" },
+	"sip":          { "desc": "Src IP"    },
+	"dip":          { "desc": "Dst IP"    },
+	"dport":        { "desc": "Dst Port"  },
+	"owner":        { "desc": "Owner"     },
+	"flows":        { "desc": "Flows",           "fmt": "int" },
+	"flows_refer":  { "desc": "Reference Value", "fmt": "int" }
+};
+

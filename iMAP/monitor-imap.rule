@@ -1,0 +1,313 @@
+# =============================================================================
+# This file defines the rule to monitor imap device.
+#
+# Huan Song <songh@grg.net.cn>
+# Nanjing Yunlilai (C) 2018-2019
+# =============================================================================
+import "monitor/iMAP/cfg//%(__sys_lang__)/monitor-imap.rule";
+
+
+# -----------------------------------------------------------------------------
+# Setup the timestamp so that query() function could use the save timestamp.
+# -----------------------------------------------------------------------------
+__now__ = now();
+
+
+# -----------------------------------------------------------------------------
+# __alert() - Output the alarm result.
+#
+# This function returns the list itself for chain operation.
+# -----------------------------------------------------------------------------
+def __alert(list, args) {
+	__subtype__      = args["subtype"];
+	__level__        = args["level"];
+
+	__desc_type__    = args["desc_type"];
+	__desc_subtype__ = args["desc_subtype"];
+	__desc_action__  = args["desc_action"];
+	__desc_title__   = args["desc_title"];
+
+	return alert(list);
+}
+
+
+# -----------------------------------------------------------------------------
+# query_dport() - check dport white list.
+#
+# @args: Configuration of per dport.
+# return: a dport list
+# -----------------------------------------------------------------------------
+def query_dport(lis,args) {
+	#threshold = args["threshold"];
+	imap_host = __ihost__;
+	#pprint(imap_host);
+	dportdic = __wl_port__;
+	if(dportdic[0]=="#"){
+		return ["#"];
+	}
+	#pprint(dportdic);
+	dportlist=item_values(dportdic,"port");
+	#pprint(dportlis);
+	#pprint(__long_range__);
+	sql = "
+		SELECT   dport
+		FROM     'tcp-*'
+		WHERE        last(%(__range__))
+				 AND sip = $(imap_host)
+				 AND not(dport IN $(dportlist))
+		GROUP BY dport
+		LIMIT    500
+	";
+
+	res = query(sql);
+	rres=item_values(res,"dport"); 
+	#pprint("first:");
+	#pprint(rres);
+	# alert
+	dres=[];
+	nows=time("T");
+	for itm in rres{
+		tmp={};
+		tmp["dport"]=itm;
+		tmp["@timestamp"]=nows;
+		tmp["sip"]=imap_host;
+		dres=append(dres,tmp);
+	}
+	__alert(dres,args);
+	return dportlist; 
+}
+
+
+# -----------------------------------------------------------------------------
+# query_domain_last() - Query per domain of white list.
+#
+# @args: Configuration of per dport.
+# return: a dip list(refer domain)
+# -----------------------------------------------------------------------------
+def query_domain_last(lis,args) {
+	#threshold = args["threshold"];
+	imap_host = __ihost__;
+	domainlis = __wl_domain__;
+	if(domainlis[0]=="#"){
+		return ["#"];
+	}
+	#pprint(__long_range__);
+	sql = "
+		SELECT   answer as dip
+		FROM     'dns-*'
+		WHERE        last(%(__long_range__))
+				 AND sip = $(imap_host)
+				 AND domain IN $(domainlis)
+				 AND ip_range(answer,'0.0.0.0 to 255.255.255.255')
+		GROUP BY domain,answer
+		LIMIT    500,50
+	";
+
+	res = query(sql);
+	wl_dips=item_values(res,"dip"); 
+	#pprint("first:");
+	#pprint(rres);
+	return wl_dips; 
+}
+
+# -----------------------------------------------------------------------------
+# compare_dip() - compare with dips which are from domain whitelist.
+#
+# @listDip: A list of dip .
+# @args:    Configuration of per dip.
+#return: a dip list(NOT IN white list)
+# -----------------------------------------------------------------------------
+def compare_dip(listDip, args) {
+	if(listDip[0]=="#"){
+		return ["#"];
+	}
+	finallist=[];
+	dportlis=[80,443];
+	imap_host = __ihost__;
+
+	sql = "
+		SELECT   SUM(flow) AS flows
+		FROM     'tcp-*'
+		WHERE        last(%(__range__))
+				 AND sip = $(imap_host)
+				 AND dport IN $(dportlis)
+		GROUP BY dip
+		LIMIT    500
+	";
+	res=query(sql);
+	dipres=item_values(res,"dip");
+
+	# compare
+	for item in dipres{
+		if(item IN listDip){
+			continue;
+		}	
+		else{
+			finallist=append(finallist,item);
+		}
+	}
+
+	# alert 
+	if len(finallist) == 0 {
+		return finallist;
+	}
+	else{
+		flist=[];
+		now = time("T");
+		for itm in finallist{
+			results={};
+			results["dip"]=itm;
+			results["@timestamp"]=now;
+			flist=append(flist,results);
+		}
+		__throttle_keys__ = [ "dip" ];
+		__alert(flist, args);
+		return finallist;
+	}
+	
+}
+
+
+# -----------------------------------------------------------------------------
+# query_sip_dip() - Query per sip/dip and get timeout_state_num.if (sip,dip)
+#					has 3_times_handshake then alert.
+#
+# @listRes: A list of previous dip(out of white list ).
+# @args:    Configuration of per dip.
+# -----------------------------------------------------------------------------
+def query_sip_dip(listRes, args) {
+	imap_host = __ihost__;
+	#pprint imap_host;
+	if (len(listRes) == 0 or listRes[0]=="#"){
+		return listRes;
+	}
+	sql = "
+		SELECT   timeout_state_num
+		FROM     'tcp-*'
+		WHERE        last(%(__range__))
+				 AND sip = $(imap_host)
+				 AND dip IN $(listRes)
+				 AND timeout_state_num IN $(__valid_status__)
+		GROUP BY dip,timeout_state_num
+		LIMIT    500,50
+	";
+	res = query(sql);
+
+	tmpdip=agg_values(res,"dip","timeout_state_num");
+	diplis=item_values(tmpdip,"dip");
+	#__throttle_keys__ = [ "dip" ];
+	if(len(diplis)==0){
+		return diplis;
+	}
+	else{
+		fres=[];
+		now=time("T");
+		for itms in diplis{
+			tmps={};
+			tmps["dip"]=itms;
+			tmps["sip"]=imap_host;
+			tmps["@timestamp"]=now;
+			fres=append(fres,tmps);
+		}
+		__alert(fres, args);
+		#pprint("second:");
+		#pprint(res);
+		return fres;
+	}
+	
+}
+
+
+# -----------------------------------------------------------------------------
+# query_dport_dip() - Query per dport and check dip white list .
+#
+# @listRes: A list of previous result.
+# @args:    Configuration of per dip.
+# -----------------------------------------------------------------------------
+def query_dport_dip(lis, args) {
+	imap_host = __ihost__;
+	#pprint imap_host;
+	dportdic = __wl_port__;
+	if(dportdic[0]=="#"){
+		return ["#"];
+	}
+	if len(dportdic) == 0 {
+		return listRes;
+	}
+	dportlist=item_values(dportdic,"port");
+	sql = "
+		SELECT   dip,dport
+		FROM     'tcp-*'
+		WHERE        last(%(__range__))
+				 AND sip = $(imap_host)
+				 AND dport IN $(dportlist)
+		GROUP BY dport,dip
+		LIMIT    50,500
+	";
+	res = query(sql);
+	# get diplist group by dport 
+	tmpdip=agg_values(res,"dport","dip");
+	if(len(tmpdip)==0){
+		return tmpdip;
+	}
+
+	#compare
+	results=[];
+	out_dip=[];
+	for itm in tmpdip{
+		portnum=itm["dport"];
+		dips=itm["dip"];
+		#whitelist
+		for wl_itm in dportdic{
+			if(wl_itm["port"]==portnum){
+				wl_dip=wl_itm["dip"];
+				if(wl_dip[0]=="#"){
+					continue;
+				}
+				#compare dip
+				for dd in dips{
+					if(not(dd IN wl_dip)){
+						tmp={};
+						nows=time("T");
+						tmp["@timestamp"]=nows;
+						tmp["dip"]=dd;
+						results=append(results,tmp);
+						out_dip=append(out_dip,dd);
+					}
+				}
+			}
+		}
+	}
+	# alert
+	__alert(results, args);
+	#pprint("second:");
+	#pprint(res);
+	return out_dip;
+}
+
+
+# -----------------------------------------------------------------------------
+# main() - Main entry of the rule.
+# -----------------------------------------------------------------------------
+def main() {
+	func_list = [
+		# check dport whitelist 
+		{ "name": "query_dport",           "args": __cfg_dport__ },
+		# check dport(80/443) with their whitelist
+		{ "name": "query_domain_last",           "args": __cfg_domain__ },
+		{ "name": "compare_dip",     		"args": __cfg_domain__ },
+		{ "name": "query_sip_dip", 			"args": __cfg_sip_dip__ },
+		# check other dport with their dip whitelist
+		{ "name": "query_dport_dip",           "args": __cfg_domain__ },
+		{ "name": "query_sip_dip", 			"args": __cfg_sip_dip__ }
+	];
+
+	call_list(func_list);
+}
+
+
+# -----------------------------------------------------------------------------
+# Run the rule.
+# -----------------------------------------------------------------------------
+main();
+
