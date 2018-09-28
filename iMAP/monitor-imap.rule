@@ -93,7 +93,7 @@ def query_domain_last(lis,args) {
 	}
 	#pprint(__long_range__);
 	sql = "
-		SELECT   answer as dip
+		SELECT   answer
 		FROM     'dns-*'
 		WHERE        last(%(__long_range__))
 				 AND sip = $(imap_host)
@@ -104,7 +104,7 @@ def query_domain_last(lis,args) {
 	";
 
 	res = query(sql);
-	wl_dips=item_values(res,"dip"); 
+	wl_dips=item_values(res,"answer"); 
 	#pprint("first:");
 	#pprint(rres);
 	return wl_dips; 
