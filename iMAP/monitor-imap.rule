@@ -93,12 +93,12 @@ def query_domain_last(lis,args) {
 	}
 	#pprint(__long_range__);
 	sql = "
-		SELECT   answer
+		SELECT   SUM(flow) AS flows
 		FROM     'dns-*'
 		WHERE        last(%(__long_range__))
 				 AND sip = $(imap_host)
 				 AND domain IN $(domainlis)
-				 AND ip_range(answer,'0.0.0.0 to 255.255.255.255')
+				 AND ip_range(answer,'0.0.0.0 TO 255.255.255.255')
 		GROUP BY domain,answer
 		LIMIT    500,50
 	";
@@ -182,7 +182,7 @@ def query_sip_dip(listRes, args) {
 		return listRes;
 	}
 	sql = "
-		SELECT   timeout_state_num
+		SELECT   SUM(flow) AS flows
 		FROM     'tcp-*'
 		WHERE        last(%(__range__))
 				 AND sip = $(imap_host)
@@ -235,53 +235,69 @@ def query_dport_dip(lis, args) {
 		return listRes;
 	}
 	dportlist=item_values(dportdic,"port");
+	diplist=[];
+	diprange=[];
+	# get dip white list
+	for p in dportdic{
+		dlis=p["dip"];
+		drange=p["range"];
+		for i in dlis{
+			if(i=="#"){
+				break;
+			}
+			else{
+				diplist=append(diplist,i);
+			}
+		}
+		for j in drange{
+			if(j=="#"){
+				break;
+			}
+			else{
+				diprange=append(diprange,j);
+			}
+		}
+
+	}
+	#pprint(dportlist);
+	#pprint(diprange);
 	sql = "
-		SELECT   dip,dport
+		SELECT   SUM(flow) AS flows
 		FROM     'tcp-*'
 		WHERE        last(%(__range__))
 				 AND sip = $(imap_host)
 				 AND dport IN $(dportlist)
+				 AND NOT(dip IN $(diplist) OR ip_ranges(dip,$(diprange)))
 		GROUP BY dport,dip
 		LIMIT    50,500
 	";
 	res = query(sql);
-	# get diplist group by dport 
+	#pprint(res);
+	# get suspect dip
 	tmpdip=agg_values(res,"dport","dip");
 	if(len(tmpdip)==0){
 		return tmpdip;
 	}
-
-	#compare
-	results=[];
 	out_dip=[];
-	for itm in tmpdip{
-		portnum=itm["dport"];
-		dips=itm["dip"];
-		#whitelist
-		for wl_itm in dportdic{
-			if(wl_itm["port"]==portnum){
-				wl_dip=wl_itm["dip"];
-				if(wl_dip[0]=="#"){
-					continue;
-				}
-				#compare dip
-				for dd in dips{
-					if(not(dd IN wl_dip)){
-						tmp={};
-						nows=time("T");
-						tmp["@timestamp"]=nows;
-						tmp["dip"]=dd;
-						results=append(results,tmp);
-						out_dip=append(out_dip,dd);
-					}
-				}
-			}
+	results=[];
+	#pprint("hello");
+	#pprint(tmpdip);
+	for dp in tmpdip{
+		for dd in dp["dip"]{
+			tmp={};
+			nows=time("T");
+			tmp["@timestamp"]=nows;
+			tmp["dip"]=dd;
+			results=append(results,tmp);
+			out_dip=append(out_dip,dd);
 		}
+					
 	}
+	#pprint(out_dip);
 	# alert
 	__alert(results, args);
 	#pprint("second:");
-	#pprint(res);
+	
 	return out_dip;
 }
 
