@@ -32,7 +32,10 @@ __wl_domain__ =[
 		"bitnodes.earn.com",
 		"www.spamhaus.org",
 		"feodotracker.abuse.ch",
-		"sslbl.abuse.ch"
+		"sslbl.abuse.ch",
+		"ransomwaretracker.abuse.ch",
+		"www.malwaredomainlist.com",
+		"api.xforce.ibmcloud.com"
 	];
 # -----------------------------------------------------------------------------
 # 3_times_handshake succeeded flg
