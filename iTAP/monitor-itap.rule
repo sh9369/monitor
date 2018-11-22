@@ -4,7 +4,7 @@
 # Huan Song <songh@grg.net.cn>
 # Nanjing Yunlilai (C) 2018-2019
 # =============================================================================
-import "monitor/iMAP/cfg//%(__sys_lang__)/monitor-imap.rule";
+import "monitor/iTAP/cfg//%(__sys_lang__)/monitor-itap.rule";
 
 
 # -----------------------------------------------------------------------------
@@ -43,6 +43,7 @@ def query_dport(lis,args) {
 	imap_host = __ihost__;
 	#pprint(imap_host);
 	dportdic = __wl_port__;
+		indx = __tcp_index__;
 	if(dportdic[0]=="#"){
 		return ["#"];
 	}
@@ -52,7 +53,7 @@ def query_dport(lis,args) {
 	#pprint(__long_range__);
 	sql = "
 		SELECT   dport
-		FROM     'tcp-*'
+		FROM     $(indx)
 		WHERE        last(%(__range__))
 				 AND sip = $(imap_host)
 				 AND not(dport IN $(dportlist))
@@ -90,13 +91,14 @@ def query_domain_last(lis,args) {
 	#threshold = args["threshold"];
 	imap_host = __ihost__;
 	domainlis = __wl_domain__;
+	indx = __dns_index__;
 	if(domainlis[0]=="#"){
 		return ["#"];
 	}
 	#pprint(__long_range__);
 	sql = "
 		SELECT   SUM(flow) AS flows
-		FROM     'dns-*'
+		FROM     $(indx)
 		WHERE        last(%(__long_range__))
 				 AND dip = $(imap_host)
 				 AND domain IN $(domainlis)
@@ -126,6 +128,7 @@ def query_domain_last(lis,args) {
 # -----------------------------------------------------------------------------
 def query_sip_dip(listRes, args) {
 	imap_host = __ihost__;
+	indx = __tcp_index__;
 	#pprint imap_host;
 	if (len(listRes) == 0 or listRes[0]=="#"){
 		return listRes;
@@ -135,7 +138,7 @@ def query_sip_dip(listRes, args) {
 		dips=ls["dip"];
 		sql = "
 			SELECT   SUM(flow) AS flows
-			FROM     'tcp-*'
+			FROM     $(indx)
 			WHERE        last(%(__range__))
 					 AND sip = $(imap_host)
 					 AND dip IN $(dips)
@@ -182,14 +185,32 @@ def query_dport_dip(lis, args) {
 	imap_host = __ihost__;
 	#pprint imap_host;
 	dportdic = __wl_port__;
+	indx = __tcp_index__;
 	if(dportdic[0]=="#"){
 		# 构造80/443
 		dportdic =[
-			{"port":443,"dip":[],"range":[]},
-			{"port":80,"dip":[],"range":[]}
+			{"port":443,"dip":lis,"range":[]},
+			{"port":80,"dip":lis,"range":[]}
 		];
+	}else{
+		dportlist=item_values(dportdic,"port");
+		if(NOT(80 IN dportlist)){
+			# 构造80/443
+			tmp={};
+			tmp["port"]=80;
+			tmp["dip"]=lis;
+			tmp["range"]=[];
+			dportdic=append(dportdic,tmp);
+		}
+		if(NOT(443 IN dportlist)){
+			# 构造80/443
+			tmp={};
+			tmp["port"]=443;
+			tmp["dip"]=lis;
+			tmp["range"]=[];
+			dportdic=append(dportdic,tmp);
+		}
 	}
-
 	dportlist=item_values(dportdic,"port");
 	retdic=[];
 	# get dip white list
@@ -198,11 +219,8 @@ def query_dport_dip(lis, args) {
 		idport=p["port"];
 		dlis=p["dip"];
 		drange=p["range"];
-		for i in dlis{
-			if(i=="#"){
-				dlis=[];
-				break;
-			}
+		if(dlis[0]=="#"){
+			dlis=[];
 		}
 		if(idport==80 || idport==443){
 			#merge
@@ -212,16 +230,13 @@ def query_dport_dip(lis, args) {
 				}
 			}
 		}
-		for j in drange{
-			if(j=="#"){
-				drange=[];
-				break;
-			}
+		if(drange[0]=="#"){
+			drange=[];
 		}
 		# search dips which are not in dip whitelist by dport
 		sql = "
 			SELECT   SUM(flow) AS flows
-			FROM     'tcp-*'
+			FROM     $(indx)
 			WHERE        last(%(__range__))
 					 AND sip = $(imap_host)
 					 AND dport = $(idport)

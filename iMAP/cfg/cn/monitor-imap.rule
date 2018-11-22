@@ -16,10 +16,12 @@
 __type__  = "TCP";
 __range__ = "5m";
 __long_range__ = "12h";
-__ihost__ = "172.23.1.77";
+__ihost__ = "172.23.2.199";
+__tcp_index__ = "tcp-*";
+__dns_index__ = "dns-*";
 __wl_port__ =[
 		{"port":22,"dip":["172.23.1.168"],"range":["#"]},
-		{"port":9300,"dip":["#"],"range":["#"]},
+		{"port":9300,"dip":["#"],"range":["#"]}
 		{"port":443,"dip":["#"],"range":["#"]},
 		{"port":80,"dip":["#"],"range":["#"]}
 	];

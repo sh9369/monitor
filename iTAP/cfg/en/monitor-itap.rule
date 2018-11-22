@@ -16,7 +16,9 @@
 __type__  = "TCP";
 __range__ = "5m";
 __long_range__ = "12h";
-__ihost__ = "172.23.1.77";
+__ihost__ = "172.23.2.199";
+__tcp_index__ = "tcp-*";
+__dns_index__ = "dns-*";
 __wl_port__ =[
 		{"port":22,"dip":["172.23.1.168"],"range":["#"]},
 		{"port":9300,"dip":["#"],"range":["#"]},
@@ -34,7 +36,7 @@ __valid_status__ = [ 3, 4, 5, 6, 7, 8, 13, 14, 15 ];
 # 检测 dport 配置信息
 # -----------------------------------------------------------------------------
 #threshold     = 120;
-desc_type     = "[monitor] iMAP has suspect connection";
+desc_type     = "[monitor] iTAP has suspect connection";
 desc_subtype  = "Try to connect with outside by suspect dport";
 __cfg_dport__ = {
 	"type":      "suspect_connection",
@@ -58,7 +60,7 @@ __cfg_dport__ = {
 # 检测 domain 配置信息
 # -----------------------------------------------------------------------------
 #threshold     = 120;
-desc_type     = "[monitor] iMAP has suspect connection";
+desc_type     = "[monitor] iTAP has suspect connection";
 desc_subtype  = "Try to connect with suspect dip";
 __cfg_domain__ = {
 	"type":      "suspect_connection",
@@ -81,7 +83,7 @@ __cfg_domain__ = {
 # 检测 三次握手 配置信息
 # -----------------------------------------------------------------------------
 #threshold     = 120;
-desc_type     = "[monitor] iMAP has suspect connection";
+desc_type     = "[monitor] iTAP has suspect connection";
 desc_subtype  = "Connected with suspect dip";
 __cfg_sip_dip__ = {
 	"type":      "suspect_connection",
