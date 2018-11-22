@@ -21,7 +21,7 @@ __tcp_index__ = "tcp-*";
 __dns_index__ = "dns-*";
 __wl_port__ =[
 		{"port":22,"dip":["172.23.1.168"],"range":["#"]},
-		{"port":9300,"dip":["#"],"range":["#"]}
+		{"port":9300,"dip":["#"],"range":["#"]},
 		{"port":443,"dip":["#"],"range":["#"]},
 		{"port":80,"dip":["#"],"range":["#"]}
 	];
