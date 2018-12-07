@@ -14,7 +14,7 @@
 # __range__: 检测数据时间窗口 (从当前到过去一段时间);
 # ——__wl_port__ ： 根据端口对应的dip的白名单； range支持CIDR或"A TO B"的形式；
 # -----------------------------------------------------------------------------
-__type__  = "TCP";
+__type__  = "Monitor";
 __range__ = "5m";
 __long_range__ = "12h";
 __ihost__ = "172.23.2.199";
@@ -26,34 +26,22 @@ __wl_port__ =[
 		{"port":443,"dip":["#"],"range":["#"]},
 		{"port":80,"dip":["#"],"range":["#"]}
 	];
-__wl_domain__ =[
-		"zerodot1.gitlab.io",
-		"zeustracker.abuse.ch",
-		"osint.bambenekconsulting.com",
-		"bitnodes.earn.com",
-		"www.spamhaus.org",
-		"feodotracker.abuse.ch",
-		"sslbl.abuse.ch",
-		"ransomwaretracker.abuse.ch",
-		"www.malwaredomainlist.com",
-		"api.xforce.ibmcloud.com"
-	];
+__wl_domain__ =["#"];
 # -----------------------------------------------------------------------------
 # 3_times_handshake succeeded flg
 # -----------------------------------------------------------------------------
-__valid_status__ = [ 3, 4, 5, 6, 7, 8, 13, 14, 15 ];
+__valid_status__ = [ 3, 4, 5, 6, 7, 8, 13, 14];
 
 
 # -----------------------------------------------------------------------------
 # 检测 dport 配置信息
 # -----------------------------------------------------------------------------
 #threshold     = 120;
-desc_type     = "[monitor] iMAP has suspect connection";
+desc_type     = "[monitor] iTAP has suspect connection";
 desc_subtype  = "Try to connect with outside by suspect dport";
 __cfg_dport__ = {
-	"type":      "suspect_connection",
 	"subtype":	"suspect_dport",
-	"level":     "warn",
+	"level":     "info",
 	#"threshold": threshold,
 	"refer_enable": true,
 	"refer_range":  "last_weeks(2, %(__range__))",
@@ -67,15 +55,13 @@ __cfg_dport__ = {
 };
 
 
-
 # -----------------------------------------------------------------------------
-# 检测 domain 配置信息
+# 检测 dip 配置信息
 # -----------------------------------------------------------------------------
 #threshold     = 120;
-desc_type     = "[monitor] iMAP has suspect connection";
+desc_type     = "[monitor] iTAP has suspect connection";
 desc_subtype  = "Try to connect with suspect dip";
 __cfg_domain__ = {
-	"type":      "suspect_connection",
 	"subtype":	"suspect_dip",
 	"level":     "info",
 	#"threshold": threshold,
@@ -95,11 +81,10 @@ __cfg_domain__ = {
 # 检测 三次握手 配置信息
 # -----------------------------------------------------------------------------
 #threshold     = 120;
-desc_type     = "[monitor] iMAP has suspect connection";
-desc_subtype  = "Connected with suspect dip";
+desc_type     = "[monitor] iTAP has suspect connection";
+desc_subtype  = "iTAP connected with outside successfully";
 __cfg_sip_dip__ = {
-	"type":      "suspect_connection",
-	"subtype":	 "3_times_handshake",
+	"subtype":	 "suspect_connection",
 	"level":     "warn",
 	#"threshold": threshold,
 
