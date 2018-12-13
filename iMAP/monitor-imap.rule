@@ -58,18 +58,17 @@ def query_dport(lis,args) {
 		WHERE        last(%(__range__))
 				 AND sip = $(imap_host)
 				 AND not(dport IN $(dportlist))
-		GROUP BY dport
-		LIMIT    500
 	";
 
 	res = query(sql);
-	rres=item_values(res,"dport"); 
+	dport_list=item_values(res,"dport"); 
 	#pprint("first:");
-	#pprint(rres);
+	#pprint(dport_list);
+
 	# alert
 	dres=[];
 	nows=time("T");
-	for itm in rres{
+	for itm in dport_list{
 		tmp={};
 		tmp["dport"]=itm;
 		tmp["@timestamp"]=nows;
@@ -77,7 +76,7 @@ def query_dport(lis,args) {
 		dres=append(dres,tmp);
 	}
 	__alert(dres,args);
-	return rres; 
+	return dport_list; 
 }
 
 
@@ -105,7 +104,7 @@ def query_dport_dip_warn(lis,args) {
 				AND dport IN $(lis)
 				AND timeout_state_num IN $(__valid_status__)
 		GROUP BY dip,dport
-		LIMIT    500,500
+		LIMIT    50,50
 	";
 	res = query(sql);
 	#pprint(res);
@@ -159,23 +158,162 @@ def query_domain_last(lis,args) {
 	}
 	#pprint(__long_range__);
 	sql = "
-		SELECT   SUM(flow) AS flows
+		SELECT   answer
 		FROM     $(indx)
 		WHERE        last(%(__long_range__))
 				 AND dip = $(imap_host)
 				 AND domain IN $(domainlis)
 				 AND isresponse = 1
 				 AND ip_range(answer,'0.0.0.0 TO 255.255.255.255')
-		GROUP BY domain,answer
-		LIMIT    500,50
 	";
 
 	res = query(sql);
-	# wl_dips是domain whitelist 转成dip whitelist
-	wl_dips=item_values(res,"answer"); 
-	#pprint("first:");
-	#pprint(wl_dips);
-	return wl_dips; 
+	# res 是 domain whitelist 转成dip whitelist
+	return res; 
+}
+
+
+
+
+# -----------------------------------------------------------------------------
+# merge_wl_port() - Query per dport and check dip white list .
+# 将domain whitelist得到的dip与wl_port合并
+#
+# @listRes: A list of previous result.
+# @args:    Configuration of per dip.
+# -----------------------------------------------------------------------------
+def merge_wl_port(lis, args){
+	if(lis[0]=="#" || len(lis)==0){
+		return __wl_port__;
+	}
+	flg_80=0;
+	flg_443=0;
+	#从domain转换得到了IP list
+	dportdic = __wl_port__;
+	if(dportdic[0]=="#"){
+		# 构造80/443
+		dportdic =[
+			{"port":443,"dip":lis,"range":[]},
+			{"port":80,"dip":lis,"range":[]}
+		];
+	}else{
+		dportlist=item_values(dportdic,"port");
+		# 原wl_port没有80或443则添加由domain转换而得的IP
+		if(NOT(80 IN dportlist)){
+			# 构造80/443
+			tmp={};
+			tmp["port"]=80;
+			tmp["dip"]=lis;
+			tmp["range"]=[];
+			dportdic=append(dportdic,tmp);
+			flg_80=1;
+		}
+		if(NOT(443 IN dportlist)){
+			# 构造80/443
+			tmp={};
+			tmp["port"]=443;
+			tmp["dip"]=lis;
+			tmp["range"]=[];
+			dportdic=append(dportdic,tmp);
+			flg_443=1;
+		}
+	}
+	# 原wl_port存在80或443，则合并
+	if(flg_80==1 && flg_443==1){
+		return dportdic;
+	}else{
+		for p in dportdic{
+			tmpret={};
+			idport=p["port"];
+			dlis=p["dip"];
+			drange=p["range"];
+			if(dlis[0]=="#"){
+				dlis=[];
+			}
+			if(idport==80 && flg_80==0){
+				#merge
+				for ii in lis{
+					if(ii!="#"){
+						dlis=append(dlis,ii);
+					}
+				}
+			}else if(idport==443 && flg_443==0){
+				#merge
+				for ii in lis{
+					if(ii!="#"){
+						dlis=append(dlis,ii);
+					}
+				}
+			}
+		}
+		return dportdic;
+	}
+}
+
+
+
+
+
+# -----------------------------------------------------------------------------
+# query_dport_dip() - Query per dport and check dip white list .
+# 将domain whitelist得到的dip与wl_port合并
+#
+# @listRes: A list of previous result.
+# @args:    Configuration of per dip.
+# -----------------------------------------------------------------------------
+def query_dport_dip(lis, args) {
+	imap_host = __ihost__;
+	#pprint imap_host;
+	dportdic = __wl_port__;
+	indx = __tcp_index__;
+	retdic=[];
+	# get dip white list
+	for p in dportdic{
+		tmpret={};
+		idport=p["port"];
+		dlis=p["dip"];
+		drange=p["range"];
+		if(dlis[0]=="#"){
+			dlis=[];
+		}
+		if(drange[0]=="#"){
+			drange=[];
+		}
+		
+		# search dips which are not in dip whitelist by dport
+		sql = "
+			SELECT   SUM(flow) AS flows
+			FROM     $(indx)
+			WHERE        last(%(__range__))
+					 AND sip = $(imap_host)
+					 AND dport = $(idport)
+					 AND NOT(dip IN $(dlis) OR ip_ranges(dip,$(drange)))
+			GROUP BY dip
+			LIMIT    500
+		";
+		res = query(sql);
+		tmpdiplis=item_values(res,"dip");
+		# 汇总
+		tmpret["port"]=idport;
+		tmpret["diplist"]=tmpdiplis;
+		retdic=append(retdic,tmpret);
+
+		# alert
+		results=[];
+		for dp in tmpdiplis{
+			tmp={};
+			nows=time("T");
+			tmp["@timestamp"]=nows;
+			tmp["dip"]=dp;
+			tmp["dport"]=idport;
+			results=append(results,tmp);	
+		}
+		#pprint(out_dip);
+		# alert
+		__alert(results, args);
+	}
+
+	return retdic;
 }
 
 
@@ -197,29 +335,25 @@ def query_sip_dip(listRes, args) {
 	}
 	for ls in listRes{
 		iport=ls["port"];
-		dips=ls["dip"];
+		dips=ls["diplist"];
 		sql = "
-			SELECT   SUM(flow) AS flows
+			SELECT   dip
 			FROM     $(indx)
 			WHERE        last(%(__range__))
 					 AND sip = $(imap_host)
 					 AND dip IN $(dips)
 					 AND dport = $(iport)
 					 AND timeout_state_num IN $(__valid_status__)
-			GROUP BY dip,timeout_state_num
-			LIMIT    500,50
 		";
 		res = query(sql);
-		tmpdip=agg_values(res,"dip","timeout_state_num");
-		diplis=item_values(tmpdip,"dip");
 		# alert
-		if(len(diplis)==0){
+		if(len(res)==0){
 			continue;
 		}
 		else{
 			fres=[];
 			now=time("T");
-			for itms in diplis{
+			for itms in res{
 				tmps={};
 				tmps["dip"]=itms;
 				tmps["sip"]=imap_host;
@@ -237,102 +371,6 @@ def query_sip_dip(listRes, args) {
 
 
 # -----------------------------------------------------------------------------
-# query_dport_dip() - Query per dport and check dip white list .
-# 将domain whitelist得到的dip与wl_port合并
-#
-# @listRes: A list of previous result.
-# @args:    Configuration of per dip.
-# -----------------------------------------------------------------------------
-def query_dport_dip(lis, args) {
-	imap_host = __ihost__;
-	#pprint imap_host;
-	dportdic = __wl_port__;
-	indx = __tcp_index__;
-	if(dportdic[0]=="#"){
-		# 构造80/443
-		dportdic =[
-			{"port":443,"dip":lis,"range":[]},
-			{"port":80,"dip":lis,"range":[]}
-		];
-	}else{
-		dportlist=item_values(dportdic,"port");
-		if(NOT(80 IN dportlist)){
-			# 构造80/443
-			tmp={};
-			tmp["port"]=80;
-			tmp["dip"]=lis;
-			tmp["range"]=[];
-			dportdic=append(dportdic,tmp);
-		}
-		if(NOT(443 IN dportlist)){
-			# 构造80/443
-			tmp={};
-			tmp["port"]=443;
-			tmp["dip"]=lis;
-			tmp["range"]=[];
-			dportdic=append(dportdic,tmp);
-		}
-	}
-	dportlist=item_values(dportdic,"port");
-	retdic=[];
-	# get dip white list
-	for p in dportdic{
-		tmpret={};
-		idport=p["port"];
-		dlis=p["dip"];
-		drange=p["range"];
-		if(dlis[0]=="#"){
-			dlis=[];
-		}
-		if(idport==80 || idport==443){
-			#merge
-			for ii in lis{
-				if(ii!="#" && NOT(ii in dlis)){
-					dlis=append(dlis,ii);
-				}
-			}
-		}
-		if(drange[0]=="#"){
-			drange=[];
-		}
-		# search dips which are not in dip whitelist by dport
-		sql = "
-			SELECT   SUM(flow) AS flows
-			FROM     $(indx)
-			WHERE        last(%(__range__))
-					 AND sip = $(imap_host)
-					 AND dport = $(idport)
-					 AND NOT(dip IN $(dlis) OR ip_ranges(dip,$(drange)))
-			GROUP BY dip
-			LIMIT    500
-		";
-		res = query(sql);
-		tmpdip=item_values(res,"dip");
-		# 汇总
-		tmpret["port"]=idport;
-		tmpret["dip"]=tmpdip;
-		retdic=append(retdic,tmpret);
-
-		# alert
-		results=[];
-		for dp in tmpdip{
-			tmp={};
-			nows=time("T");
-			tmp["@timestamp"]=nows;
-			tmp["dip"]=dp;
-			tmp["dport"]=idport;
-			results=append(results,tmp);	
-		}
-		#pprint(out_dip);
-		# alert
-		__alert(results, args);
-	}
-
-	return retdic;
-}
-
-
-# -----------------------------------------------------------------------------
 # main() - Main entry of the rule.
 # -----------------------------------------------------------------------------
 def main() {
@@ -342,6 +380,7 @@ def main() {
 		{ "name": "query_dport_dip_warn",       "args": __cfg_sip_dip__ },
 		# check dport with their whitelist
 		{ "name": "query_domain_last",           "args": __cfg_domain__ },
+		{ "name": "merge_wl_port",           	"args": __cfg_domain__ },
 		{ "name": "query_dport_dip",           "args": __cfg_domain__ },
 		{ "name": "query_sip_dip", 			"args": __cfg_sip_dip__ }
 	];
