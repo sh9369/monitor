@@ -143,7 +143,8 @@ def query_dport_dip_warn(lis,args) {
 
 # -----------------------------------------------------------------------------
 # query_domain_last() - Query per domain of white list.
-# 转换domain whitelist，与port whitelist合并
+# 转换domain whitelist，与port whitelist合并；
+# 若wl_domain数量增多，请调大LIMIT 数值
 #
 # @args: Configuration of per dport.
 # return: a dip list(refer domain)
@@ -158,13 +159,15 @@ def query_domain_last(lis,args) {
 	}
 	#pprint(__long_range__);
 	sql = "
-		SELECT   answer
+		SELECT   SUM(flow) AS flows
 		FROM     $(indx)
 		WHERE        last(%(__long_range__))
 				 AND dip = $(imap_host)
 				 AND domain IN $(domainlis)
 				 AND isresponse = 1
 				 AND ip_range(answer,'0.0.0.0 TO 255.255.255.255')
+		GROUP BY answer
+		LIMIT 200
 	";
 
 	res = query(sql);

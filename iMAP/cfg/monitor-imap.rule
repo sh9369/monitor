@@ -35,8 +35,9 @@ __wl_domain__ =[
 		"feodotracker.abuse.ch",
 		"sslbl.abuse.ch",
 		"ransomwaretracker.abuse.ch",
-		"www.malwaredomainlist.com",
-		"api.xforce.ibmcloud.com"
+		"www.malwaredomainlist.com",s
+		"api.xforce.ibmcloud.com",
+		"github.com"
 	];
 # -----------------------------------------------------------------------------
 # 3_times_handshake succeeded flg
