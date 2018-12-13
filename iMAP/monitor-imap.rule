@@ -169,6 +169,7 @@ def query_domain_last(lis,args) {
 
 	res = query(sql);
 	# res 是 domain whitelist 转成dip whitelist
+	anslis=item_values(res,"answer");
 	return res; 
 }
 
