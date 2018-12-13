@@ -53,29 +53,33 @@ def query_dport(lis,args) {
 	#pprint(__long_range__);
 	#获取 白名单之外的端口信息
 	sql = "
-		SELECT   dport
+		SELECT   SUM(flow) AS flows
 		FROM     $(indx)
 		WHERE        last(%(__range__))
-				 AND sip = $(imap_host)
-				 AND not(dport IN $(dportlist))
+				 AND sip IN $(imap_host)
+				 AND NOT(dport IN $(dportlist))
+		GROUP BY sip,dport
+		LIMIT 50,50
 	";
 
 	res = query(sql);
-	dport_list=item_values(res,"dport"); 
+	#dport_list=item_values(res,"dport"); 
 	#pprint("first:");
 	#pprint(dport_list);
 
 	# alert
 	dres=[];
 	nows=time("T");
-	for itm in dport_list{
+	for itm in res{
 		tmp={};
-		tmp["dport"]=itm;
+		tmp["dport"]=itm["dport"];
 		tmp["@timestamp"]=nows;
-		tmp["sip"]=imap_host;
+		tmp["sip"]=itm["sip"];
 		dres=append(dres,tmp);
 	}
 	__alert(dres,args);
+	# sip为key,dport list为值
+	dport_list=agg_values(res,"sip","dport");
 	return dport_list; 
 }
 
@@ -91,54 +95,55 @@ def query_dport_dip_warn(lis,args) {
 	if(len(lis)==0){
 		return ["#"];
 	}
-	imap_host = __ihost__;
 	indx = __tcp_index__;
-	#pprint(imap_host);
 	#pprint(lis);
 	# 查找与dport通讯成功的dip
-	sql = "
-		SELECT   SUM(flow) AS flows
-		FROM     $(indx)
-		WHERE        last(%(__range__))
-				AND sip = $(imap_host)
-				AND dport IN $(lis)
-				AND timeout_state_num IN $(__valid_status__)
-		GROUP BY dip,dport
-		LIMIT    50,50
-	";
-	res = query(sql);
-	#pprint(res);
-	dp_dip=agg_values(res,"dport","dip");
-	#pprint(dp_dip);
-	# alert
-	dres=[];
-	nows=time("T");
-	for dd in dp_dip{
-		dp=dd["dport"];
-		dip_lis=dd["dip"];
-		# dport对应的dip个数大于3,则输出127.0.0.1告警；否则输出对应dip
-		if(len(dip_lis)>3){
-			tmp={};
-			tmp["dport"]=dp;
-			tmp["dip"]="127.0.0.1";
-			tmp["@timestamp"]=nows;
-			tmp["sip"]=imap_host;
-			dres=append(dres,tmp);
-		}
-		else{
-			for itm in dip_lis{
+	for dic in lis{
+		itap_host=dic["sip"];
+		dportlis=dic["dport"];
+		sql = "
+			SELECT   SUM(flow) AS flows
+			FROM     $(indx)
+			WHERE        last(%(__range__))
+					AND sip = $(itap_host)
+					AND dport IN $(dportlis)
+					AND timeout_state_num IN $(__valid_status__)
+			GROUP BY dip,dport
+			LIMIT    50,50
+		";
+		res = query(sql);
+		#pprint(res);
+		dp_dip=agg_values(res,"dport","dip");
+		#pprint(dp_dip);
+		# alert
+		dres=[];
+		nows=time("T");
+		for dd in dp_dip{
+			dp=dd["dport"];
+			dip_lis=dd["dip"];
+			# dport对应的dip个数大于3,则输出127.0.0.1告警；否则输出对应dip
+			if(len(dip_lis)>3){
 				tmp={};
 				tmp["dport"]=dp;
-				tmp["dip"]=itm;
+				tmp["dip"]="127.0.0.1";
 				tmp["@timestamp"]=nows;
-				tmp["sip"]=imap_host;
+				tmp["sip"]=itap_host;
 				dres=append(dres,tmp);
+			}else{
+				for itm in dip_lis{
+					tmp={};
+					tmp["dport"]=dp;
+					tmp["dip"]=itm;
+					tmp["@timestamp"]=nows;
+					tmp["sip"]=itap_host;
+					dres=append(dres,tmp);
+				}
 			}
 		}
+		__alert(dres,args);
 	}
 	
-	__alert(dres,args);
-	return imap_host;
+	return lis;
 }
 
 
@@ -162,7 +167,7 @@ def query_domain_last(lis,args) {
 		SELECT   answer
 		FROM     $(indx)
 		WHERE        last(%(__long_range__))
-				 AND dip = $(imap_host)
+				 AND dip IN $(imap_host)
 				 AND isresponse = 1
 				 AND domain IN $(domainlis)
 				 AND ip_range(answer,'0.0.0.0 TO 255.255.255.255')
@@ -266,7 +271,7 @@ def query_dport_dip(lis, args) {
 	dportdic = lis;
 	indx = __tcp_index__;
 	retdic=[];
-	# get dip white list
+	# get dip white list, 按端口检查
 	for p in dportdic{
 		tmpret={};
 		idport=p["port"];
@@ -285,27 +290,29 @@ def query_dport_dip(lis, args) {
 			SELECT   SUM(flow) AS flows
 			FROM     $(indx)
 			WHERE        last(%(__range__))
-					 AND sip = $(imap_host)
+					 AND sip IN $(imap_host)
 					 AND dport = $(idport)
 					 AND NOT(dip IN $(dlis) OR ip_ranges(dip,$(drange)))
-			GROUP BY dip
-			LIMIT    500
+			GROUP BY sip,dip
+			LIMIT    50,50
 		";
 		res = query(sql);
 		#pprint(res);
-		tmpdiplis=item_values(res,"dip");
+		# sip 为 key , dip list 为值
+		#tmpdiplis=agg_values(res,"sip","dip");
 		# 汇总,记录dport,dip
 		tmpret["port"]=idport;
-		tmpret["diplist"]=tmpdiplis;
+		tmpret["ips"]=res;
 		retdic=append(retdic,tmpret);
 
-		# alert
+		# alert , info
 		results=[];
-		for dp in tmpdiplis{
+		for dp in res{
 			tmp={};
 			nows=time("T");
 			tmp["@timestamp"]=nows;
-			tmp["dip"]=dp;
+			tmp["sip"]=dp["sip"];
+			tmp["dip"]=dp["dip"];
 			tmp["dport"]=idport;
 			results=append(results,tmp);	
 		}
@@ -328,7 +335,7 @@ def query_dport_dip(lis, args) {
 # @args:    Configuration of per dip.
 # -----------------------------------------------------------------------------
 def query_sip_dip(listRes, args) {
-	imap_host = __ihost__;
+	#imap_host = __ihost__;
 	indx = __tcp_index__;
 	#pprint imap_host;
 	if (len(listRes) == 0 or listRes[0]=="#"){
@@ -336,15 +343,19 @@ def query_sip_dip(listRes, args) {
 	}
 	for ls in listRes{
 		iport=ls["port"];
-		dips=ls["diplist"];
+		ipres=ls["ips"];
+		itap_host_lis=item_values(ipres,"sip");
+		dips=item_values(ipres,"dip");
 		sql = "
-			SELECT   dip
+			SELECT   SUM(flow) AS flows
 			FROM     $(indx)
 			WHERE        last(%(__range__))
-					 AND sip = $(imap_host)
+					 AND sip IN $(itap_host_lis)
 					 AND dport = $(iport)
 					 AND dip IN $(dips)
 					 AND timeout_state_num IN $(__valid_status__)
+			GROUP BY sip,dip
+			LIMIT 50,50
 		";
 		res = query(sql);
 		# alert
@@ -356,8 +367,8 @@ def query_sip_dip(listRes, args) {
 			now=time("T");
 			for itms in res{
 				tmps={};
-				tmps["dip"]=itms;
-				tmps["sip"]=imap_host;
+				tmps["dip"]=itms["dip"];
+				tmps["sip"]=itms["sip"];
 				tmps["dport"]=iport;
 				tmps["@timestamp"]=now;
 				fres=append(fres,tmps);

@@ -349,8 +349,7 @@ def query_sip_dip(listRes, args) {
 		# alert
 		if(len(res)==0){
 			continue;
-		}
-		else{
+		}else{
 			fres=[];
 			now=time("T");
 			for itms in res{
