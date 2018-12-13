@@ -241,6 +241,7 @@ def merge_wl_port(lis, args){
 						dlis=append(dlis,ii);
 					}
 				}
+				p["dip"]=dlis;
 			}else if(idport==443 && flg_443==0){
 				#merge
 				for ii in lis{
@@ -248,6 +249,7 @@ def merge_wl_port(lis, args){
 						dlis=append(dlis,ii);
 					}
 				}
+				p["dip"]=dlis;
 			}
 		}
 		return dportdic;
