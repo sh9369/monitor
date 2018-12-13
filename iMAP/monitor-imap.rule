@@ -268,7 +268,7 @@ def merge_wl_port(lis, args){
 def query_dport_dip(lis, args) {
 	imap_host = __ihost__;
 	#pprint imap_host;
-	dportdic = __wl_port__;
+	dportdic = lis;
 	indx = __tcp_index__;
 	retdic=[];
 	# get dip white list
