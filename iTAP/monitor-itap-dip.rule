@@ -4,8 +4,8 @@
 # Huan Song <songh@grg.net.cn>
 # Nanjing Yunlilai (C) 2018-2019
 # =============================================================================
-import "monitor/iTAP/cfg/monitor-itap-cfg.rule";
-import "monitor/iTAP/cfg/%(__sys_lang__)/monitor-itap.rule";
+import "security/monitor/iTAP/cfg/monitor-itap-cfg.rule";
+import "security/monitor/iTAP/cfg/%(__sys_lang__)/monitor-itap.rule";
 
 
 # -----------------------------------------------------------------------------

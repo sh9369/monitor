@@ -4,8 +4,8 @@
 # Huan Song <songh@grg.net.cn>
 # Nanjing Yunlilai (C) 2018-2019
 # =============================================================================
-import "monitor/iMAP/cfg/monitor-imap-cfg.rule";
-import "monitor/iMAP/cfg/%(__sys_lang__)/monitor-imap.rule";
+import "security/monitor/iMAP/cfg/monitor-imap-cfg.rule";
+import "security/monitor/iMAP/cfg/%(__sys_lang__)/monitor-imap.rule";
 
 
 # -----------------------------------------------------------------------------
