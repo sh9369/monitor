@@ -18,7 +18,7 @@
 __type__  = "Monitor";
 __range__ = "5m";
 __long_range__ = "12h";
-__ihost__ = "172.23.2.199";
+__ihost__ = ["172.23.2.199"];
 __tcp_index__ = "tcp-*";
 __dns_index__ = "dns-*";
 __offset__= 5 * MS_MIN;

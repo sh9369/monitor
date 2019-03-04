@@ -1,5 +1,5 @@
 # =============================================================================
-# This file defines the rule to monitor imap device.
+# This file defines the rule to monitor itap device.
 #
 # Huan Song <songh@grg.net.cn>
 # Nanjing Yunlilai (C) 2018-2019
@@ -54,29 +54,31 @@ def query_dport(lis,args) {
 	#pprint(__long_range__);
 	#获取 白名单之外的端口信息
 	sql = "
-		SELECT   dport
+		SELECT   SUM(flow) AS flows
 		FROM     $(indx)
 		WHERE        last(%(__range__))
-				 AND sip = $(imap_host)
-				 AND not(dport IN $(dportlist))
+				 AND sip IN $(imap_host)
+				 AND NOT (dport IN $(dportlist))
+		GROUP BY sip,dport
+		LIMIT 5,50
 	";
 
-	res = query(sql);
-	dport_list=item_values(res,"dport"); 
+	res = query(sql); 
 	#pprint("first:");
 	#pprint(dport_list);
 
 	# alert
 	dres=[];
 	nows=time("T");
-	for itm in dport_list{
+	for itm in res{
 		tmp={};
-		tmp["dport"]=itm;
+		tmp["dport"]=itm["dport"];
 		tmp["@timestamp"]=nows;
-		tmp["sip"]=imap_host;
+		tmp["sip"]=itm["sip"];
 		dres=append(dres,tmp);
 	}
 	__alert(dres,args);
+	dport_list=item_values(res,"dport");
 	return dport_list; 
 }
 
@@ -101,11 +103,11 @@ def query_dport_dip_warn(lis,args) {
 		SELECT   SUM(flow) AS flows
 		FROM     $(indx)
 		WHERE        last(%(__range__))
-				AND sip = $(imap_host)
+				AND sip IN $(imap_host)
 				AND dport IN $(lis)
 				AND timeout_state_num IN $(__valid_status__)
-		GROUP BY dip,dport
-		LIMIT    50,50
+		GROUP BY sip,dip,dport
+		LIMIT    5,50,50
 	";
 	res = query(sql);
 	#pprint(res);
@@ -114,28 +116,13 @@ def query_dport_dip_warn(lis,args) {
 	# alert
 	dres=[];
 	nows=time("T");
-	for dd in dp_dip{
-		dp=dd["dport"];
-		dip_lis=dd["dip"];
-		# dport对应的dip个数大于3,则输出127.0.0.1告警；否则输出对应dip
-		if(len(dip_lis)>3){
-			tmp={};
-			tmp["dport"]=dp;
-			tmp["dip"]="127.0.0.1";
-			tmp["@timestamp"]=nows;
-			tmp["sip"]=imap_host;
-			dres=append(dres,tmp);
-		}
-		else{
-			for itm in dip_lis{
-				tmp={};
-				tmp["dport"]=dp;
-				tmp["dip"]=itm;
-				tmp["@timestamp"]=nows;
-				tmp["sip"]=imap_host;
-				dres=append(dres,tmp);
-			}
-		}
+	for dd in res{
+		tmp={};
+		tmp["dport"]=dd["dport"];
+		tmp["dip"]=dd["dip"];
+		tmp["@timestamp"]=nows;
+		tmp["sip"]=dd["sip"];
+		dres=append(dres,tmp);
 	}
 	
 	__alert(dres,args);

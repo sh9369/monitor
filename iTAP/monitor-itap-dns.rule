@@ -55,25 +55,25 @@ def query_domain_info(lis,args) {
 		FROM     $(indx)
 		WHERE        last(%(__range__))
 				 AND isresponse = 0
-				 AND sip = $(imap_host)
+				 AND sip IN $(imap_host)
 				 AND NOT (domain IN $(domainlis))
 				 
-		GROUP BY domain,answer
-		LIMIT 200
+		GROUP BY sip,domain,answer
+		LIMIT 5,50,5
 	";
 
 	res = query(sql);
 	# res 是 domain whitelist 转成dip whitelist
-	dnslis=item_values(res,"domain");
+	#dnslis=item_values(res,"domain");
 
 	# alert
 	dres=[];
 	nows=time("T");
-	for itm in dnslis{
+	for itm in res{
 		tmp={};
-		tmp["domain"]=itm;
+		tmp["domain"]=itm["domain"];
 		tmp["@timestamp"]=nows;
-		tmp["sip"]=imap_host;
+		tmp["sip"]=itm["sip"];
 		dres=append(dres,tmp);
 	}
 	__alert(dres,args);
@@ -98,22 +98,22 @@ def query_domain_warn(lis,args) {
 		SELECT   SUM(flow) AS flows
 		FROM     $(indx)
 		WHERE        last(%(__range__))
-				 AND sip = $(imap_host)
+				 AND sip IN $(imap_host)
 				 AND dip IN $(diplis)
 				 AND timeout_state_num IN $(__valid_status__)
-		GROUP BY dip
-		LIMIT 200
+		GROUP BY sip,dip
+		LIMIT 5,50
 	";
 	res = query(sql);
-	tmpdiplis=item_values(res,"dip");
+	#tmpdiplis=item_values(res,"dip");
 	# alert
 	dres=[];
 	nows=time("T");
-	for itm in tmpdiplis{
+	for itm in res{
 		tmp={};
-		tmp["dip"]=itm;
+		tmp["dip"]=itm["dip"];
 		tmp["@timestamp"]=nows;
-		tmp["sip"]=imap_host;
+		tmp["sip"]=itm["sip"];
 		tmp["level"]=warn;
 		dres=append(dres,tmp);
 	}

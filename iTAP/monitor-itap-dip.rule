@@ -53,8 +53,8 @@ def query_domain_last(lis,args) {
 		SELECT   SUM(flow) AS flows
 		FROM     $(indx)
 		WHERE        last(%(__long_range__))
-				 AND isresponse = 1
-				 AND dip = $(imap_host)
+				 AND isresponse = 0
+				 AND sip IN $(imap_host)
 				 AND domain IN $(domainlis)
 		GROUP BY answer
 		LIMIT 200
@@ -91,7 +91,7 @@ def query_domain_last(lis,args) {
 
 # -----------------------------------------------------------------------------
 # query_dport_dip() - Query per dport and check dip white list .
-# 检查是否存在对白名单以为的 dip 访问
+# 检查是否存在对白名单以外的 dip 访问
 #
 # @listRes: A list of previous result.
 # @args:    Configuration of per dip.
@@ -108,26 +108,26 @@ def query_dport_dip(lis, args) {
 		SELECT   SUM(flow) AS flows
 		FROM     $(indx)
 		WHERE        last(%(__range__))
-				 AND sip = $(imap_host)
+				 AND sip IN $(imap_host)
 				 AND NOT(dip IN $(diplist) OR ip_ranges(dip,$(diprange)))
-		GROUP BY dip
-		LIMIT    500
+		GROUP BY sip,dip
+		LIMIT    5,50
 	";
 	res = query(sql);
-	tmpdiplis=item_values(res,"dip");
 	# alert
 	results=[];
-	for dp in tmpdiplis{
+	for dpl in res{
 		tmp={};
 		nows=time("T");
 		tmp["@timestamp"]=nows;
-		tmp["dip"]=dp;
-		tmp["sip"]=imap_host;
+		tmp["dip"]=dpl["dip"];
+		tmp["sip"]=dpl["sip"];
 		results=append(results,tmp);	
 	}
 	#pprint(out_dip);
 	# alert
 	__alert(results, args);
+	tmpdiplis=item_values(res,"dip");
 	return tmpdiplis;
 }
 
@@ -152,11 +152,11 @@ def query_sip_dip(listRes, args) {
 		SELECT   SUM(flow) AS flows
 		FROM     $(indx)
 		WHERE        last(%(__range__))
-				 AND sip = $(imap_host)
+				 AND sip IN $(imap_host)
 				 AND dip IN $(listRes)
 				 AND timeout_state_num IN $(__valid_status__)
-		GROUP BY dip,dport
-		LIMIT 100,100
+		GROUP BY sip,dip,dport
+		LIMIT 5,50,10
 	";
 	res = query(sql);
 	# alert
@@ -168,7 +168,7 @@ def query_sip_dip(listRes, args) {
 		for itms in res{
 			tmps={};
 			tmps["dip"]=itms["dip"];
-			tmps["sip"]=imap_host;
+			tmps["sip"]=itms["sip"];
 			tmps["dport"]=itms["dport"];
 			tmps["@timestamp"]=now;
 			fres=append(fres,tmps);
