@@ -53,8 +53,8 @@ def query_domain_last(lis,args) {
 		SELECT   SUM(flow) AS flows
 		FROM     $(indx)
 		WHERE        last(%(__long_range__))
-				 AND isresponse = 0
-				 AND sip IN $(imap_host)
+				 AND isresponse = 1
+				 AND dip IN $(imap_host)
 				 AND domain IN $(domainlis)
 		GROUP BY answer
 		LIMIT 200
