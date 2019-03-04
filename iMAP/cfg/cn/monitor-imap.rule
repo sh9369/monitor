@@ -1,0 +1,115 @@
+# =============================================================================
+# 本文件定义规则的配置信息.
+#
+# Huan Song
+# 南京云利来 (C) 2018-2019
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 检测 dport 配置信息,info
+# -----------------------------------------------------------------------------
+#threshold     = 120;
+desc_type     = "[监控] iMAP 存在可疑通讯";
+desc_subtype  = "尝试连接可疑端口";
+__cfg_dport__ = {
+	"subtype":	"suspect_dport",
+	"level":     "info",
+	#"threshold": threshold,
+	"refer_enable": true,
+	"refer_range":  "last_weeks(2, %(__range__))",
+	"refer_def":    60,
+	"refer_factor": 2.5,
+
+	"desc_type":    desc_type,
+	"desc_subtype": desc_subtype,
+	"desc_action":  "Please check it out.",
+	"desc_title":   desc_type + ": " + desc_subtype
+};
+
+
+# -----------------------------------------------------------------------------
+# 检测 dns 配置信息
+# -----------------------------------------------------------------------------
+#threshold     = 120;
+desc_type     = "[监控] iMAP 存在可疑通讯";
+desc_subtype  = "尝试通过dns请求可疑域名";
+__cfg_domain__ = {
+	"subtype":	"suspect_domain",
+	"level":     "info",
+	#"threshold": threshold,
+	"refer_enable": true,
+	"refer_range":  "last_weeks(2, %(__range__))",
+	"refer_def":    60,
+	"refer_factor": 2.5,
+
+	"desc_type":    desc_type,
+	"desc_subtype": desc_subtype,
+	"desc_action":  "Please check it out.",
+	"desc_title":   desc_type + ": " + desc_subtype
+};
+
+
+# -----------------------------------------------------------------------------
+# 检测 dip 配置信息
+# -----------------------------------------------------------------------------
+#threshold     = 120;
+desc_type     = "[监控] iMAP 存在可疑通讯";
+desc_subtype  = "尝试连接可疑目的地址";
+__cfg_dip__ = {
+	"subtype":	"suspect_dip",
+	"level":     "info",
+	#"threshold": threshold,
+	"refer_enable": true,
+	"refer_range":  "last_weeks(2, %(__range__))",
+	"refer_def":    60,
+	"refer_factor": 2.5,
+
+	"desc_type":    desc_type,
+	"desc_subtype": desc_subtype,
+	"desc_action":  "Please check it out.",
+	"desc_title":   desc_type + ": " + desc_subtype
+};
+
+
+
+
+# -----------------------------------------------------------------------------
+# 检测 三次握手 配置信息
+# -----------------------------------------------------------------------------
+#threshold     = 120;
+desc_type     = "[监控] iMAP 存在可疑通讯";
+desc_subtype  = "iMAP 与可疑目的地址通讯成功";
+__cfg_sip_dip__ = {
+	"subtype":	 "suspect_connection",
+	"level":     "warn",
+	#"threshold": threshold,
+
+	"refer_enable": true,
+	"refer_range":  "last_weeks(2, %(__range__))",
+	"refer_def":    60,
+	"refer_factor": 2.5,
+
+	"desc_type":    desc_type,
+	"desc_subtype": desc_subtype,
+	"desc_action":  "Please check it out.",
+	"desc_title":   desc_type + ": " + desc_subtype
+};
+
+# -----------------------------------------------------------------------------
+# Configuration of fields description (for emails).
+#
+# <key>:        Field name.
+# <value>.desc: Field description.
+# <value>.fmt:  Data format.
+# -----------------------------------------------------------------------------
+__fields_all__ = {
+	"@timestamp":   { "desc": "Timestamp" },
+	"sip":          { "desc": "Src IP"    },
+	"dip":          { "desc": "Dst IP"    },
+	"dport":        { "desc": "Dst Port"  },
+	"owner":        { "desc": "Owner"     },
+	"flows":        { "desc": "Flows",           "fmt": "int" },
+	"flows_refer":  { "desc": "Reference Value", "fmt": "int" }
+};
+

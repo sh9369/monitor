@@ -1,0 +1,165 @@
+# =============================================================================
+# This file defines the rule to monitor imap device.
+#
+# Huan Song <songh@grg.net.cn>
+# Nanjing Yunlilai (C) 2018-2019
+# =============================================================================
+import "monitor/iMAP/cfg/monitor-imap-cfg.rule";
+import "monitor/iMAP/cfg/%(__sys_lang__)/monitor-imap.rule";
+
+
+# -----------------------------------------------------------------------------
+# Setup the timestamp so that query() function could use the save timestamp.
+# -----------------------------------------------------------------------------
+__now__ = now()-__offset__;
+
+
+# -----------------------------------------------------------------------------
+# __alert() - Output the alarm result.
+#
+# This function returns the list itself for chain operation.
+# -----------------------------------------------------------------------------
+def __alert(list, args) {
+	__subtype__      = args["subtype"];
+	__level__        = args["level"];
+
+	__desc_type__    = args["desc_type"];
+	__desc_subtype__ = args["desc_subtype"];
+	__desc_action__  = args["desc_action"];
+	__desc_title__   = args["desc_title"];
+
+	return alert(list);
+}
+
+
+# -----------------------------------------------------------------------------
+# query_dport() - check dport white list.
+# 检测是否存在端口白名单之外的端口
+#
+# @args: Configuration of per dport.
+# return: a dport list
+# -----------------------------------------------------------------------------
+def query_dport(lis,args) {
+	#threshold = args["threshold"];
+	imap_host = __ihost__;
+	#pprint(imap_host);
+	dportdic = __wl_port__;
+	indx = __tcp_index__;
+	if(dportdic[0]=="#"){ #端口白名单为空
+		return ["#"];
+	}
+	#pprint(dportdic);
+	dportlist=item_values(dportdic,"port");
+	#pprint(dportlist);
+	#pprint(__long_range__);
+	#获取 白名单之外的端口信息
+	sql = "
+		SELECT   dport
+		FROM     $(indx)
+		WHERE        last(%(__range__))
+				 AND sip = $(imap_host)
+				 AND not(dport IN $(dportlist))
+	";
+
+	res = query(sql);
+	dport_list=item_values(res,"dport"); 
+	#pprint("first:");
+	#pprint(dport_list);
+
+	# alert
+	dres=[];
+	nows=time("T");
+	for itm in dport_list{
+		tmp={};
+		tmp["dport"]=itm;
+		tmp["@timestamp"]=nows;
+		tmp["sip"]=imap_host;
+		dres=append(dres,tmp);
+	}
+	__alert(dres,args);
+	return dport_list; 
+}
+
+
+# -----------------------------------------------------------------------------
+# query_dport_dip_warn(lis,args) - lis是可疑端口的list
+# 检测sip是否使用可疑dport进行成功通讯，并记录dip
+#
+# @args: Configuration of per dport.
+# return: a dip-dport list
+# -----------------------------------------------------------------------------
+def query_dport_dip_warn(lis,args) {
+	if(len(lis)==0){
+		return ["#"];
+	}
+	imap_host = __ihost__;
+	indx = __tcp_index__;
+	#pprint(imap_host);
+	#pprint(lis);
+	# 查找与dport通讯成功的dip
+	sql = "
+		SELECT   SUM(flow) AS flows
+		FROM     $(indx)
+		WHERE        last(%(__range__))
+				AND sip = $(imap_host)
+				AND dport IN $(lis)
+				AND timeout_state_num IN $(__valid_status__)
+		GROUP BY dip,dport
+		LIMIT    50,50
+	";
+	res = query(sql);
+	#pprint(res);
+	dp_dip=agg_values(res,"dport","dip");
+	#pprint(dp_dip);
+	# alert
+	dres=[];
+	nows=time("T");
+	for dd in dp_dip{
+		dp=dd["dport"];
+		dip_lis=dd["dip"];
+		# dport对应的dip个数大于3,则输出127.0.0.1告警；否则输出对应dip
+		if(len(dip_lis)>3){
+			tmp={};
+			tmp["dport"]=dp;
+			tmp["dip"]="127.0.0.1";
+			tmp["@timestamp"]=nows;
+			tmp["sip"]=imap_host;
+			dres=append(dres,tmp);
+		}
+		else{
+			for itm in dip_lis{
+				tmp={};
+				tmp["dport"]=dp;
+				tmp["dip"]=itm;
+				tmp["@timestamp"]=nows;
+				tmp["sip"]=imap_host;
+				dres=append(dres,tmp);
+			}
+		}
+	}
+	
+	__alert(dres,args);
+	return imap_host;
+}
+
+
+
+# -----------------------------------------------------------------------------
+# main() - Main entry of the rule.
+# -----------------------------------------------------------------------------
+def main() {
+	func_list = [
+		# check dport whitelist 
+		{ "name": "query_dport",           "args": __cfg_dport__ },
+		{ "name": "query_dport_dip_warn",       "args": __cfg_sip_dip__ }
+	];
+
+	call_list(func_list);
+}
+
+
+# -----------------------------------------------------------------------------
+# Run the rule.
+# -----------------------------------------------------------------------------
+main();
+

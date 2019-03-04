@@ -1,0 +1,139 @@
+# =============================================================================
+# This file defines the rule to monitor imap device.
+#
+# Huan Song <songh@grg.net.cn>
+# Nanjing Yunlilai (C) 2018-2019
+# =============================================================================
+import "monitor/iMAP/cfg/monitor-imap-cfg.rule";
+import "monitor/iMAP/cfg/%(__sys_lang__)/monitor-imap.rule";
+
+
+# -----------------------------------------------------------------------------
+# Setup the timestamp so that query() function could use the save timestamp.
+# -----------------------------------------------------------------------------
+__now__ = now()-__offset__;
+
+
+# -----------------------------------------------------------------------------
+# __alert() - Output the alarm result.
+#
+# This function returns the list itself for chain operation.
+# -----------------------------------------------------------------------------
+def __alert(list, args) {
+	__subtype__      = args["subtype"];
+	__level__        = args["level"];
+
+	__desc_type__    = args["desc_type"];
+	__desc_subtype__ = args["desc_subtype"];
+	__desc_action__  = args["desc_action"];
+	__desc_title__   = args["desc_title"];
+
+	return alert(list);
+}
+
+
+
+# -----------------------------------------------------------------------------
+# query_domain_last() - Query per domain of white list.
+# 检测发起不在白名单的dns domain 查询；
+# 若wl_domain数量增多，请调大 LIMIT 数值
+#
+# @args: Configuration of per dport.
+# return: a dip list(refer domain)
+# -----------------------------------------------------------------------------
+def query_domain_info(lis,args) {
+	#threshold = args["threshold"];
+	imap_host = __ihost__;
+	domainlis = __wl_domain__;
+	indx = __dns_index__;
+	if(domainlis[0]=="#"){
+		return ["#"];
+	}
+	#pprint(__long_range__);
+	sql = "
+		SELECT   SUM(flow) AS flows
+		FROM     $(indx)
+		WHERE        last(%(__range__))
+				 AND isresponse = 0
+				 AND sip = $(imap_host)
+				 AND not (domain IN $(domainlis))
+				 
+		GROUP BY domain,answer
+		LIMIT 200
+	";
+
+	res = query(sql);
+	# res 是 domain whitelist 转成dip whitelist
+	dnslis=item_values(res,"domain");
+
+	# alert
+	dres=[];
+	nows=time("T");
+	for itm in dnslis{
+		tmp={};
+		tmp["domain"]=itm;
+		tmp["@timestamp"]=nows;
+		tmp["sip"]=imap_host;
+		dres=append(dres,tmp);
+	}
+	__alert(dres,args);
+	return res; 
+}
+
+
+# -----------------------------------------------------------------------------
+# query_domain_dip() - Query per domain of white list.
+# 检测发起不在白名单的dns domain 是否存在TCP连接成功；
+#
+# @args: Configuration of per dport.
+# return: a dip list(refer domain)
+# -----------------------------------------------------------------------------
+def query_domain_warn(lis,args) {
+	# lis is res
+	anslis=item_values(res,"answer");
+	diplis=get_ipv4(anslis);
+	indx = __tcp_index__;
+	imap_host=__ihost__;
+	sql = "
+		SELECT   SUM(flow) AS flows
+		FROM     $(indx)
+		WHERE        last(%(__range__))
+				 AND sip = $(imap_host)
+				 AND dip IN $(diplis)
+				 AND timeout_state_num IN $(__valid_status__)
+		GROUP BY dip
+		LIMIT 200
+	";
+	res = query(sql);
+	tmpdiplis=item_values(res,"dip");
+	# alert
+	dres=[];
+	nows=time("T");
+	for itm in tmpdiplis{
+		tmp={};
+		tmp["dip"]=itm;
+		tmp["@timestamp"]=nows;
+		tmp["sip"]=imap_host;
+		tmp["level"]=warn;
+		dres=append(dres,tmp);
+	}
+	__alert(dres,args);
+}
+
+# -----------------------------------------------------------------------------
+# main() - Main entry of the rule.
+# -----------------------------------------------------------------------------
+def main() {
+	func_list = [
+		{ "name": "query_domain_info",           "args": __cfg_domain__ }
+	];
+
+	call_list(func_list);
+}
+
+
+# -----------------------------------------------------------------------------
+# Run the rule.
+# -----------------------------------------------------------------------------
+main();
+

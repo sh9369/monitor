@@ -1,42 +1,16 @@
 # =============================================================================
 # 本文件定义规则的配置信息.
 #
-# ZHANG Li Dan <lidan.zhang@clearclouds-global.com>
+# Huan Song
 # 南京云利来 (C) 2018-2019
-# this is for check the intelligence http/https domain and ip
 # =============================================================================
 
 
 # -----------------------------------------------------------------------------
-# 基本配置.
-#
-# __type__:  报警类型;
-# __range__: 检测数据时间窗口 (从当前到过去一段时间);
-# ——__wl_port__ ： 根据端口对应的dip的白名单； range支持CIDR或"A TO B"的形式；
-# __offset__ : 延迟5分钟进行检查，让数据完全导入es
-# -----------------------------------------------------------------------------
-__type__  = "Monitor";
-__range__ = "5m";
-__long_range__ = "12h";
-__ihost__ = ["172.17.0.65","172.17.0.66"];
-__tcp_index__ = "tcp-*";
-__dns_index__ = "dns-*";
-__offset__= 5 * MS_MIN;
-__wl_port__ =[
-		{"port":9200,"dip":["172.17.0.68"],"range":["#"]}
-	];
-__wl_domain__ =["#"];
-# -----------------------------------------------------------------------------
-# 3_times_handshake succeeded flg
-# -----------------------------------------------------------------------------
-__valid_status__ = [ 3, 4, 5, 6, 7, 8, 13, 14];
-
-
-# -----------------------------------------------------------------------------
-# 检测 dport 配置信息
+# 检测 dport 配置信息,info
 # -----------------------------------------------------------------------------
 #threshold     = 120;
-desc_type     = "[monitor] iTAP has suspect connection";
+desc_type     = "[monitor] iMAP has suspect connection";
 desc_subtype  = "Try to connect with outside by suspect dport";
 __cfg_dport__ = {
 	"subtype":	"suspect_dport",
@@ -55,13 +29,13 @@ __cfg_dport__ = {
 
 
 # -----------------------------------------------------------------------------
-# 检测 dip 配置信息
+# 检测 dns 配置信息
 # -----------------------------------------------------------------------------
 #threshold     = 120;
-desc_type     = "[monitor] iTAP has suspect connection";
-desc_subtype  = "Try to connect with suspect dip";
+desc_type     = "[monitor] iMAP has suspect connection";
+desc_subtype  = "Try to request suspect domain of dns";
 __cfg_domain__ = {
-	"subtype":	"suspect_dip",
+	"subtype":	"suspect_domain",
 	"level":     "info",
 	#"threshold": threshold,
 	"refer_enable": true,
@@ -77,11 +51,35 @@ __cfg_domain__ = {
 
 
 # -----------------------------------------------------------------------------
+# 检测 dip 配置信息
+# -----------------------------------------------------------------------------
+#threshold     = 120;
+desc_type     = "[monitor] iMAP has suspect connection";
+desc_subtype  = "Try to connect with suspect dip";
+__cfg_dip__ = {
+	"subtype":	"suspect_dip",
+	"level":     "info",
+	#"threshold": threshold,
+	"refer_enable": true,
+	"refer_range":  "last_weeks(2, %(__range__))",
+	"refer_def":    60,
+	"refer_factor": 2.5,
+
+	"desc_type":    desc_type,
+	"desc_subtype": desc_subtype,
+	"desc_action":  "Please check it out.",
+	"desc_title":   desc_type + ": " + desc_subtype
+};
+
+
+
+
+# -----------------------------------------------------------------------------
 # 检测 三次握手 配置信息
 # -----------------------------------------------------------------------------
 #threshold     = 120;
-desc_type     = "[monitor] iTAP has suspect connection";
-desc_subtype  = "iTAP connected with outside successfully";
+desc_type     = "[monitor] iMAP has suspect connection";
+desc_subtype  = "iMAP connected with outside successfully";
 __cfg_sip_dip__ = {
 	"subtype":	 "suspect_connection",
 	"level":     "warn",
