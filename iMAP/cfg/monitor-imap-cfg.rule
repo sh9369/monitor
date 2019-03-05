@@ -36,9 +36,11 @@ __wl_domain__ =[
 		"www.spamhaus.org",
 		"feodotracker.abuse.ch",
 		"sslbl.abuse.ch",
+		"urlhaus.abuse.ch",
 		"ransomwaretracker.abuse.ch",
 		"www.malwaredomainlist.com",
 		"api.xforce.ibmcloud.com",
+		"mirror1.malwaredomains.com",
 		"github.com"
 	];
 # -----------------------------------------------------------------------------
